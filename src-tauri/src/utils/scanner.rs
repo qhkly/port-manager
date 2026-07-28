@@ -105,7 +105,7 @@ async fn get_ports_ss() -> Result<Vec<PortInfo>, String> {
         return Err("ss 命令返回错误状态".to_string());
     }
 
-    parse_ss_output(String::from_utf8_lossy(&output.stdout))
+    parse_ss_output(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 #[cfg(target_os = "linux")]
