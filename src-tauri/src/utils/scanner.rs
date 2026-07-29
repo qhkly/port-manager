@@ -1,6 +1,53 @@
 use crate::models::{PortInfo, PortStatus, ProcessInfo};
 use tokio::process::Command;
 
+/// 获取指定进程的工作目录 (macOS)
+#[cfg(target_os = "macos")]
+async fn get_process_cwd(pid: u32) -> Option<String> {
+    let output = Command::new("lsof")
+        .args(["-p", &pid.to_string()])
+        .output()
+        .await
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    // 解析 lsof 输出，查找 cwd 行
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        if line.contains("cwd") && line.contains("DIR") {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 9 {
+                let path = parts[8];
+                // 过滤掉非路径的 cwd（如某些特殊设备）
+                if path.starts_with('/') || path.starts_with('~') {
+                    return Some(path.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// 获取指定进程的工作目录 (Linux)
+#[cfg(target_os = "linux")]
+async fn get_process_cwd(pid: u32) -> Option<String> {
+    let output = Command::new("readlink")
+        .args(["-e", &format!("/proc/{}/cwd", pid)])
+        .output()
+        .await
+        .ok()?;
+
+    if output.status.success() {
+        let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !path.is_empty() {
+            return Some(path);
+        }
+    }
+    None
+}
+
 /// 获取所有监听端口信息
 pub async fn get_all_listening_ports() -> Result<Vec<PortInfo>, String> {
     #[cfg(target_os = "macos")]
@@ -25,7 +72,32 @@ async fn get_ports_lsof() -> Result<Vec<PortInfo>, String> {
         return Err("lsof 命令返回错误状态".to_string());
     }
 
-    parse_lsof_output(String::from_utf8_lossy(&output.stdout).to_string())
+    let mut ports = parse_lsof_output(String::from_utf8_lossy(&output.stdout).to_string())?;
+
+    // 为每个进程获取工作目录（并发执行以提高性能）
+    let mut tasks = Vec::new();
+    for port in &mut ports {
+        if let Some(process) = &mut port.process {
+            let pid = process.pid;
+            let task = tokio::spawn(async move {
+                (pid, get_process_cwd(pid).await)
+            });
+            tasks.push(task);
+        }
+    }
+
+    // 收集结果并更新 ProcessInfo
+    for task in tasks {
+        if let Ok((pid, cwd)) = task.await {
+            if let Some(port) = ports.iter_mut().find(|p| p.process.as_ref().map(|p| p.pid) == Some(pid)) {
+                if let Some(process) = &mut port.process {
+                    process.cwd = cwd;
+                }
+            }
+        }
+    }
+
+    Ok(ports)
 }
 
 #[cfg(target_os = "macos")]
@@ -86,6 +158,7 @@ fn parse_lsof_output(output: String) -> Result<Vec<PortInfo>, String> {
                 name: command.to_string(),
                 command: line.to_string(),
                 user: Some(user),
+                cwd: None,
             }),
         });
     }
@@ -105,7 +178,32 @@ async fn get_ports_ss() -> Result<Vec<PortInfo>, String> {
         return Err("ss 命令返回错误状态".to_string());
     }
 
-    parse_ss_output(String::from_utf8_lossy(&output.stdout).to_string())
+    let mut ports = parse_ss_output(String::from_utf8_lossy(&output.stdout).to_string())?;
+
+    // 为每个进程获取工作目录（并发执行以提高性能）
+    let mut tasks = Vec::new();
+    for port in &mut ports {
+        if let Some(process) = &mut port.process {
+            let pid = process.pid;
+            let task = tokio::spawn(async move {
+                (pid, get_process_cwd(pid).await)
+            });
+            tasks.push(task);
+        }
+    }
+
+    // 收集结果并更新 ProcessInfo
+    for task in tasks {
+        if let Ok((pid, cwd)) = task.await {
+            if let Some(port) = ports.iter_mut().find(|p| p.process.as_ref().map(|p| p.pid) == Some(pid)) {
+                if let Some(process) = &mut port.process {
+                    process.cwd = cwd;
+                }
+            }
+        }
+    }
+
+    Ok(ports)
 }
 
 #[cfg(target_os = "linux")]
@@ -166,6 +264,7 @@ fn parse_ss_output(output: String) -> Result<Vec<PortInfo>, String> {
                     name,
                     command: line.to_string(),
                     user,
+                    cwd: None,
                 })
             } else {
                 None

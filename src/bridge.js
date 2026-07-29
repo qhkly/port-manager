@@ -31,6 +31,11 @@
     killProcess: (pid) => invoke('kill_process', { pid }),
     killProcessGroup: (pid) => invoke('kill_process_group', { pid }),
 
+    // 备注相关命令
+    saveNote: (path, note) => invoke('save_note', { path, note }),
+    deleteNote: (path) => invoke('delete_note', { path }),
+    getAllNotes: () => invoke('get_all_notes'),
+
     // 事件监听：返回 Promise<unlisten>
     onPortsUpdate: (callback) => listen('ports-update', (e) => callback(e.payload)),
   };

@@ -255,6 +255,49 @@ button:disabled {
   color: var(--color-text-secondary);
 }
 
+/* 工作目录列 */
+.cwd {
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 备注单元格 */
+.note-cell {
+  min-width: 150px;
+  max-width: 250px;
+}
+
+.note-content {
+  font-size: 13px;
+  color: var(--color-text);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.note-content:hover {
+  color: var(--color-primary);
+}
+
+.note-empty {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.note-empty:hover {
+  opacity: 1;
+  color: var(--color-primary);
+}
+
 .actions {
   text-align: center;
 }
@@ -336,3 +379,60 @@ button:disabled {
   cursor: pointer;
   font-size: 14px;
 }
+
+/* 备注编辑对话框 */
+.note-modal {
+  min-width: 400px;
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+}
+
+.modal-subtitle {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  font-family: 'SF Mono', Monaco, monospace;
+  margin-bottom: var(--spacing-md);
+  word-break: break-all;
+}
+
+.note-textarea-large {
+  width: 100%;
+  min-height: 100px;
+  max-height: 200px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.note-textarea-large:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.char-count {
+  text-align: right;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs);
+}
+
+/* 调整表格列宽 */
+.port-list {
+  table-layout: fixed;
+}
+
+.port-list th:nth-child(1) { width: 80px; }  /* 端口 */
+.port-list th:nth-child(2) { width: 70px; }  /* 协议 */
+.port-list th:nth-child(3) { width: 120px; } /* 进程名 */
+.port-list th:nth-child(4) { width: 80px; }  /* PID */
+.port-list th:nth-child(5) { width: 80px; }  /* 用户 */
+.port-list th:nth-child(6) { width: 250px; } /* 工作目录 */
+.port-list th:nth-child(7) { width: 200px; } /* 备注 */
+.port-list th:nth-child(8) { width: 80px; }  /* 操作 */

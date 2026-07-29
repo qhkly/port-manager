@@ -8,6 +8,9 @@ function PortPanel() {
   const [killingPort, setKillingPort] = React.useState(null);
   const [confirmPort, setConfirmPort] = React.useState(null);
   const [errorMsg, setErrorMsg] = React.useState('');
+  const [notes, setNotes] = React.useState({});
+  const [noteDialog, setNoteDialog] = React.useState(null);
+  const [noteDraft, setNoteDraft] = React.useState('');
 
   // 加载端口数据
   const loadPorts = async () => {
@@ -24,9 +27,20 @@ function PortPanel() {
     }
   };
 
+  // 加载备注
+  const loadNotes = async () => {
+    try {
+      const result = await window.Bridge.getAllNotes();
+      setNotes(result);
+    } catch (error) {
+      console.error('加载备注失败:', error);
+    }
+  };
+
   // 初始加载
   React.useEffect(() => {
     loadPorts();
+    loadNotes();
   }, []);
 
   // 监听后端自动刷新事件
@@ -73,18 +87,72 @@ function PortPanel() {
     }
   };
 
+  // 保存备注
+  const handleSaveNote = async () => {
+    if (!noteDialog) return;
+    try {
+      var trimmedNote = noteDraft.trim().slice(0, 200);
+      await window.Bridge.saveNote(noteDialog.path, trimmedNote);
+      setNotes(function(prev) {
+        var newNotes = {};
+        for (var k in prev) newNotes[k] = prev[k];
+        newNotes[noteDialog.path] = trimmedNote;
+        return newNotes;
+      });
+      setNoteDialog(null);
+      setNoteDraft('');
+    } catch (error) {
+      console.error('保存备注失败:', error);
+      setErrorMsg('保存备注失败: ' + error);
+    }
+  };
+
+  // 删除备注
+  const handleDeleteNote = async function() {
+    if (!noteDialog) return;
+    try {
+      await window.Bridge.deleteNote(noteDialog.path);
+      setNotes(function(prev) {
+        var newNotes = {};
+        for (var k in prev) if (k !== noteDialog.path) newNotes[k] = prev[k];
+        return newNotes;
+      });
+      setNoteDialog(null);
+    } catch (error) {
+      console.error('删除备注失败:', error);
+      setErrorMsg('删除备注失败: ' + error);
+    }
+  };
+
+  // 打开备注编辑对话框
+  const openNoteDialog = function(path, cwd) {
+    setNoteDialog({ path: path, cwd: cwd });
+    setNoteDraft(notes[path] || '');
+  };
+
+  // 关闭对话框
+  const closeNoteDialog = function() {
+    setNoteDialog(null);
+    setNoteDraft('');
+  };
+
   // 过滤端口
   const filteredPorts = ports.filter(function(port) {
     if (!filter) return true;
 
-    const searchLower = filter.toLowerCase();
-    const portStr = port.port.toString();
-    const processName = (port.process && port.process.name) ? port.process.name.toLowerCase() : '';
-    const command = (port.process && port.process.command) ? port.process.command.toLowerCase() : '';
+    var searchLower = filter.toLowerCase();
+    var portStr = port.port.toString();
+    var process = port.process || {};
+    var processName = process.name ? process.name.toLowerCase() : '';
+    var command = process.command ? process.command.toLowerCase() : '';
+    var cwd = process.cwd ? process.cwd.toLowerCase() : '';
+    var note = cwd ? (notes[cwd] || '').toLowerCase() : '';
 
     return portStr.indexOf(searchLower) >= 0 ||
            processName.indexOf(searchLower) >= 0 ||
-           command.indexOf(searchLower) >= 0;
+           command.indexOf(searchLower) >= 0 ||
+           cwd.indexOf(searchLower) >= 0 ||
+           note.indexOf(searchLower) >= 0;
   });
 
   // 按端口排序
@@ -94,15 +162,33 @@ function PortPanel() {
 
   // 创建表格行
   const portRows = sortedPorts.map(function(port) {
+    var process = port.process || {};
+    var cwd = process.cwd || '-';
+    var cwdKey = cwd !== '-' ? cwd : null;
+    var currentNote = cwdKey ? (notes[cwdKey] || '') : '';
+
     return React.createElement('tr', { key: port.port + '-' + port.protocol },
       React.createElement('td', { className: 'port-number' }, port.port),
       React.createElement('td', { className: 'protocol' }, port.protocol),
       React.createElement('td', {
         className: 'process-name',
-        title: port.process ? port.process.command : ''
-      }, (port.process && port.process.name) ? port.process.name : '-'),
-      React.createElement('td', { className: 'pid' }, (port.process && port.process.pid) ? port.process.pid : '-'),
-      React.createElement('td', { className: 'user' }, (port.process && port.process.user) ? port.process.user : '-'),
+        title: process.command || ''
+      }, process.name || '-'),
+      React.createElement('td', { className: 'pid' }, process.pid || '-'),
+      React.createElement('td', { className: 'user' }, process.user || '-'),
+      // 工作目录列
+      React.createElement('td', {
+        className: 'cwd',
+        title: cwd
+      }, cwd.length > 40 ? cwd.substring(0, 37) + '...' : cwd),
+      // 备注列
+      React.createElement('td', { className: 'note-cell' },
+        cwdKey ? React.createElement('span', {
+          className: currentNote ? 'note-content' : 'note-empty',
+          onClick: function() { openNoteDialog(cwdKey, cwd); },
+          title: currentNote || '点击添加备注'
+        }, currentNote || '添加备注') : '-'
+      ),
       React.createElement('td', { className: 'actions' },
         React.createElement('button', {
           onClick: function() { handleKillProcess(port.port); },
@@ -114,27 +200,27 @@ function PortPanel() {
   });
 
   // 创建空状态或表格
-  let listContent;
-  if (sortedPorts.length === 0) {
-    var emptyText = loading ? '加载中...' : (filter ? '没有找到匹配的端口' : '暂无端口数据');
-    listContent = React.createElement('div', { className: 'empty-state' }, emptyText);
-  } else {
-    listContent = React.createElement('div', { className: 'port-list-container' },
-      React.createElement('table', { className: 'port-list' },
-        React.createElement('thead', null,
-          React.createElement('tr', null,
-            React.createElement('th', null, '端口'),
-            React.createElement('th', null, '协议'),
-            React.createElement('th', null, '进程名'),
-            React.createElement('th', null, 'PID'),
-            React.createElement('th', null, '用户'),
-            React.createElement('th', null, '操作')
-          )
-        ),
-        React.createElement('tbody', null, portRows)
-      )
-    );
-  }
+  listContent = React.createElement('div', { className: 'port-list-container' },
+    sortedPorts.length === 0
+      ? React.createElement('div', { className: 'empty-state' },
+          loading ? '加载中...' : (filter ? '没有找到匹配的端口' : '暂无端口数据')
+        )
+      : React.createElement('table', { className: 'port-list' },
+          React.createElement('thead', null,
+            React.createElement('tr', null,
+              React.createElement('th', null, '端口'),
+              React.createElement('th', null, '协议'),
+              React.createElement('th', null, '进程名'),
+              React.createElement('th', null, 'PID'),
+              React.createElement('th', null, '用户'),
+              React.createElement('th', null, '工作目录'),
+              React.createElement('th', null, '备注'),
+              React.createElement('th', null, '操作')
+            )
+          ),
+          React.createElement('tbody', null, portRows)
+        )
+  );
 
   // 错误提示条
   const errorBanner = errorMsg
@@ -170,9 +256,49 @@ function PortPanel() {
       )
     : null;
 
+  // 备注编辑对话框
+  const noteEditDialog = noteDialog !== null
+    ? React.createElement('div', { className: 'modal-overlay', onClick: closeNoteDialog },
+        React.createElement('div', {
+          className: 'modal note-modal',
+          onClick: function(e) { e.stopPropagation(); }
+        },
+          React.createElement('h3', { className: 'modal-title' }, '编辑备注'),
+          React.createElement('p', { className: 'modal-subtitle' }, noteDialog.cwd),
+          React.createElement('textarea', {
+            className: 'note-textarea-large',
+            value: noteDraft,
+            onChange: function(e) { setNoteDraft(e.target.value); },
+            placeholder: '输入备注说明...',
+            maxLength: 200,
+            autoFocus: true
+          }),
+          React.createElement('div', { className: 'char-count' },
+            (noteDraft || '').length + '/200'
+          ),
+          React.createElement('div', { className: 'modal-actions' },
+            notes[noteDialog.path] ? React.createElement('button', {
+              className: 'btn-danger',
+              onClick: handleDeleteNote
+            }, '删除') : null,
+            React.createElement('div', { style: { flex: 1 } }),
+            React.createElement('button', {
+              className: 'btn-secondary',
+              onClick: closeNoteDialog
+            }, '取消'),
+            React.createElement('button', {
+              className: 'btn-primary',
+              onClick: handleSaveNote
+            }, '保存')
+          )
+        )
+      )
+    : null;
+
   return React.createElement('div', { className: 'port-panel' },
     errorBanner,
     confirmDialog,
+    noteEditDialog,
     // 控制栏
     React.createElement('div', { className: 'controls' },
       React.createElement('div', { className: 'control-group' },
@@ -193,7 +319,7 @@ function PortPanel() {
       React.createElement('div', { className: 'control-group' },
         React.createElement('input', {
           type: 'text',
-          placeholder: '搜索端口、进程名或命令...',
+          placeholder: '搜索端口、进程、目录或备注...',
           value: filter,
           onChange: function(e) { setFilter(e.target.value); },
           className: 'search-input'

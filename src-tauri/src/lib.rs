@@ -17,6 +17,9 @@ pub fn run() {
             commands::kill_port_process,
             commands::kill_process,
             commands::kill_process_group,
+            commands::get_all_notes,
+            commands::save_note,
+            commands::delete_note,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
