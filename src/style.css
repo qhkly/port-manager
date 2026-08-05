@@ -191,26 +191,55 @@ button:disabled {
 .port-list-container {
   flex: 1;
   overflow-y: auto;
+  overflow-x: auto;
   background: var(--color-surface);
   border-radius: var(--radius-md);
   min-height: 0;
+  /* 关键：允许收缩到表格 min-width 以下，才能在容器内触发横向滚动，
+     否则 flex 项的 min-width:auto 会把容器撑到 960px 直接溢出面板 */
+  min-width: 0;
 }
 
 /* 端口列表 */
 .port-list {
   width: 100%;
+  /* 固定布局：列宽由下面的 nth-child 决定，常规窗口宽度下无需横向滚动 */
+  table-layout: fixed;
+  /* 极窄窗口才横向滚动（否则工作目录/备注列会被压成 0 宽直接消失），
+     此时「操作」列靠 sticky 保持可见可点 */
+  min-width: 720px;
   border-collapse: separate;
   border-spacing: 0;
 }
 
-.port-list thead {
-  position: sticky;
-  top: 0;
-  background: var(--color-surface);
-  z-index: 10;
+/* 列宽分配：定长列 + 工作目录/备注按剩余空间伸缩 */
+.port-list th:nth-child(1), .port-list td:nth-child(1) { width: 72px; }   /* 端口 */
+.port-list th:nth-child(2), .port-list td:nth-child(2) { width: 78px; }   /* 协议 */
+.port-list th:nth-child(3), .port-list td:nth-child(3) { width: 120px; }  /* 进程名 */
+.port-list th:nth-child(4), .port-list td:nth-child(4) { width: 88px; }   /* PID */
+.port-list th:nth-child(5), .port-list td:nth-child(5) { width: 80px; }   /* 用户 */
+.port-list th:nth-child(7), .port-list td:nth-child(7) { width: 18%; }    /* 备注 */
+.port-list th:nth-child(8), .port-list td:nth-child(8) { width: 92px; }   /* 操作 */
+
+/* 操作列内边距收窄，保证「终止中...」也能完整显示 */
+.port-list th:nth-child(8),
+.port-list td:nth-child(8) {
+  padding-left: var(--spacing-sm);
+  padding-right: var(--spacing-sm);
 }
 
-.port-list thead {
+/* 所有单元格统一截断，避免长内容撑破固定列宽 */
+.port-list th,
+.port-list td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.port-list thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   background: var(--color-background);
   border-bottom: 1px solid var(--color-border);
 }
@@ -271,16 +300,6 @@ button:disabled {
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
   font-size: 12px;
   color: var(--color-text-secondary);
-  max-width: 300px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 备注单元格 */
-.note-cell {
-  min-width: 150px;
-  max-width: 250px;
 }
 
 .note-content {
@@ -311,6 +330,28 @@ button:disabled {
 
 .actions {
   text-align: center;
+}
+
+/* 操作列吸边：始终可见可点 */
+.port-list thead th:last-child,
+.port-list tbody td:last-child {
+  position: sticky;
+  right: 0;
+  background: var(--color-surface);
+  z-index: 5;
+  /* 粘性列右侧不留间距，避免 hover 时空白穿透 */
+  box-shadow: -1px 0 0 var(--color-border);
+}
+
+/* 表头吸边列置于行吸边列之上，并固定在右上角 */
+.port-list thead th:last-child {
+  top: 0;
+  z-index: 15;
+}
+
+/* hover 行的吸边单元格背景与行保持一致 */
+.port-list tbody tr:hover td:last-child {
+  background: var(--color-background);
 }
 
 /* 空状态 */
@@ -433,17 +474,3 @@ button:disabled {
   color: var(--color-text-secondary);
   margin-top: var(--spacing-xs);
 }
-
-/* 调整表格列宽 */
-.port-list {
-  table-layout: fixed;
-}
-
-.port-list th:nth-child(1) { width: 80px; }  /* 端口 */
-.port-list th:nth-child(2) { width: 70px; }  /* 协议 */
-.port-list th:nth-child(3) { width: 120px; } /* 进程名 */
-.port-list th:nth-child(4) { width: 80px; }  /* PID */
-.port-list th:nth-child(5) { width: 80px; }  /* 用户 */
-.port-list th:nth-child(6) { width: 250px; } /* 工作目录 */
-.port-list th:nth-child(7) { width: 200px; } /* 备注 */
-.port-list th:nth-child(8) { width: 80px; }  /* 操作 */
