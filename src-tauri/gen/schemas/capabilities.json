@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"端口管理器主窗口所需权限","local":true,"windows":["main"],"permissions":["core:default","core:event:default","core:window:default","core:webview:default"]}}
+{"default":{"identifier":"default","description":"端口管理器主窗口所需权限","local":true,"windows":["main"],"permissions":["core:default","core:event:default","core:window:default","core:window:allow-set-theme","core:webview:default"]}}

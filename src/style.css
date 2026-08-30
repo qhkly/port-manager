@@ -47,6 +47,14 @@
                0 4px 12px oklch(0 0 0 / 0.16);
   --shadow-pop: 0 14px 34px oklch(0 0 0 / 0.18);
 
+  /* WebKit 会依据 color-scheme 决定 prefers-color-scheme 的取值：
+     若此处写死 light，WKWebView 里 matchMedia('(prefers-color-scheme: dark)')
+     恒为 false，跟随系统模式会永远停在浅色。必须声明同时支持两种方案。 */
+  color-scheme: light dark;
+}
+
+/* 用户显式选择浅色时才把原生控件锁定为浅色。 */
+[data-theme="light"] {
   color-scheme: light;
 }
 
